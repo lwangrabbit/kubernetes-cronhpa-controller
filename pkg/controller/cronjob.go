@@ -8,6 +8,7 @@ import (
 	"github.com/ringtail/go-cron"
 	"github.com/satori/go.uuid"
 	autoscalingapi "k8s.io/api/autoscaling/v1"
+	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -199,7 +200,11 @@ func (ch *CronJobHPA) ScaleHPA() (msg string, err error) {
 	}
 
 	if updateHPA {
-		err = ch.client.Update(ctx, hpa)
+		if ch.TargetRef.RefVersion == "v2beta2" {
+			err = ch.updateHPAv2beta2(ctx, hpa)
+		} else {
+			err = ch.client.Update(ctx, hpa)
+		}
 		if err != nil {
 			return "", err
 		}
@@ -218,6 +223,26 @@ func (ch *CronJobHPA) ScaleHPA() (msg string, err error) {
 		return "", fmt.Errorf("failed to scale %s %s in %s namespace to %d, because of %v", ch.TargetRef.RefKind, ch.TargetRef.RefName, ch.TargetRef.RefNamespace, ch.DesiredSize, err)
 	}
 	return msg, nil
+}
+
+func (ch *CronJobHPA) updateHPAv2beta2(ctx context.Context, in *autoscalingapi.HorizontalPodAutoscaler) error {
+	var err error
+	hpav2beta2 := &autoscalingapiv2beta2.HorizontalPodAutoscaler{}
+	err = ch.client.Get(ctx, types.NamespacedName{Namespace: ch.HPARef.Namespace, Name: ch.TargetRef.RefName}, hpav2beta2)
+	if err != nil {
+		return fmt.Errorf("Failed to get HorizontalPodAutoscaler Ref,because of %v", err)
+	}
+	hpav2beta2.Spec.MinReplicas = in.Spec.MinReplicas
+	hpav2beta2.Spec.MaxReplicas = in.Spec.MaxReplicas
+	// https://github.com/kubernetes/kubernetes/issues/87733
+	for _, metric := range hpav2beta2.Spec.Metrics {
+		var pm = &metric
+		if pm.Object != nil && pm.Object.Target.Value.String() == "0" {
+			pm.Object.Target.Value = nil
+		}
+	}
+	err = ch.client.Update(ctx, hpav2beta2)
+	return err
 }
 
 func (ch *CronJobHPA) ScalePlainRef() (msg string, err error) {
