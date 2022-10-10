@@ -1,8 +1,16 @@
 # build params
 PREFIX?=registry.aliyuncs.com/acs
-VERSION?=v1.4.0
+VERSION?=v1.4.2
+GIT_BRANCH:=$(shell git rev-parse --abbrev-ref HEAD)
 GIT_COMMIT:=$(shell git rev-parse --short HEAD)
 CRD_OPTIONS ?= "crd:trivialVersions=true,maxDescLen=0"
+
+GO_VERSION        ?= $(shell go version)
+GO_VERSION_NUMBER ?= $(word 3, $(GO_VERSION))
+
+GO111MODULE=on
+GOOS?=linux
+GOARCH?=amd64
 
 # Image URL to use all building/pushing image targets
 IMG ?= $(PREFIX)/kubernetes-cronhpa-controller:$(VERSION)-$(GIT_COMMIT)-aliyun
@@ -16,7 +24,9 @@ test: generate fmt vet
 
 # Build kubernetes-cronhpa-controller binary
 kubernetes-cronhpa-controller: generate fmt vet
-	go build -o bin/kubernetes-cronhpa-controller github.com/AliyunContainerService/kubernetes-cronhpa-controller/cmd/kubernetes-cronhpa-controller
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) \
+		go build -ldflags="-s -X main.gitBranch=${GIT_BRANCH} -X main.gitCommit=${GIT_COMMIT} -X main.goVersion=$(GO_VERSION_NUMBER)" \
+		-o bin/kubernetes-cronhpa-controller github.com/AliyunContainerService/kubernetes-cronhpa-controller/cmd/kubernetes-cronhpa-controller
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet

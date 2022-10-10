@@ -33,13 +33,17 @@ var (
 	enableLeaderElection bool
 	pprofAddr            string
 	metricsAddr          string
+
+	gitBranch string
+	gitCommit string
+	goVersion string
 )
 
 func main() {
 	flag.StringVar(&pprofAddr, "pprof-bind-address", ":6060", "The address the pprof endpoint binds to.")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.Parse()
-	klog.Info("Start cronHPA controller.")
+	klog.Infof("Start cronHPA controller with %v, branch:%v, commit:%v.", goVersion, gitBranch, gitCommit)
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "kubernetes-cronhpa-controller",
