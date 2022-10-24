@@ -23,4 +23,5 @@ bin
 *.swo
 *~
 config/default/manager_image_patch*
-config/default/manager_image_patch.yaml-e
+config/default/manager_image_patch.yaml
+e2e-test/e2e/junit_*.xml
